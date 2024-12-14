@@ -12,12 +12,25 @@ int 10h
 jmp game_loop
 
 key_input db 0 
-direction db 1; 1, up, 2, down, 3 right, 4 left
-x_position dw 160
-y_position dw 100  
+direction db 1; 1, up, 2, down, 3 right, 4 left   
+
+
+; end, turn-segements, start
+snake_x dw 160, 160
+snake_y dw 100, 100
+
+segment_count dw 2 
+
+snake_length dw 5  
+used_length dw 1
+
 color dw 4
   
-game_loop:   
+game_loop:
+    mov bx, segment_count ; head index 
+    dec bx
+    shl bx, 1    
+    
     mov al, key_input
         
     cmp al, 'w'         
@@ -33,18 +46,18 @@ game_loop:
     je set_left 
          
     move_player:     
-
+     
     cmp direction, 2
-    jbe vertical
-      
+    jbe vertical    
+    
     horizontal:
-        mov ax, x_position  
+        mov ax, snake_x[bx]  
         cmp direction, 3  
         je positive 
         jmp negetive
       
     vertical:
-        mov ax, y_position  
+        mov ax, snake_y[bx]   
         cmp direction, 1  
         jne positive
         
@@ -60,15 +73,68 @@ game_loop:
         jbe store_y_position   
     
     store_x_position:
-        mov x_position, ax  
+        mov snake_x[bx], ax  
         jmp drawing
 
     store_y_position:
-        mov y_position, ax 
+        mov snake_y[bx], ax 
+        
+     
+        
+    ; Move tail   
+    mov cx,  used_length
+    cmp cx, snake_length
+    jl not_move_end
+    
+    ; Undraw end
+    mov ax, snake_x[0]
+    mov dx, snake_y[0]
+    mov cx, 0
+      
+    push cx
+    push dx
+    push ax
+    
+    call point
+    
+    sub sp, 6  
+    ; Move towards other cell
+    mov dx, 1 ; go positive
+      
+    mov cx, snake_x[0]
+    cmp cx, snake_x[2]    
+    je move_y
+      
+    move_x:
+        cmp cx, snake_x[2]  
+        jg set_positive_y       
+        mov dx, -1
+          
+        set_positive_y:
+        
+               
+        sub snake_x[0], dx
+        jmp drawing
+           
+    move_y: 
+        mov cx, snake_y[0] 
+        cmp cx, snake_y[2]  
+        jg set_positive_x       
+        mov dx, -1
+          
+        set_positive_x:
+        
+        sub snake_y[0], dx
+        jmp drawing
+    
+    
+    not_move_end:
+    inc used_length
+    
         
     drawing:  
-    mov ax, x_position
-    mov bx, y_position
+    mov ax, snake_x[bx]
+    mov bx, snake_y[bx]
     mov cx, color
       
     push cx
