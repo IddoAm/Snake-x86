@@ -11,26 +11,24 @@ int 10h
       
 jmp game_loop
 
-key_input db 0 
-direction db 1; 1, up, 2, down, 3 right, 4 left   
+key_input db 0  
+
+direction db 1; 1, up, 2, down, 3 right, 4 left
+last_direction db 1   
 
 
 ; end, turn-segements, start
-snake_x dw 160, 160
-snake_y dw 100, 100
+snake_x dw 160, 160, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+snake_y dw 100, 100, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 
 segment_count dw 2 
 
-snake_length dw 5  
+snake_length dw 30 
 used_length dw 1
 
 color dw 4
   
-game_loop:
-    mov bx, segment_count ; head index 
-    dec bx
-    shl bx, 1    
-    
+game_loop:       
     mov al, key_input
         
     cmp al, 'w'         
@@ -45,8 +43,27 @@ game_loop:
     cmp al, 'a'            
     je set_left 
          
-    move_player:     
-     
+    move_player:      
+    mov bx, segment_count ; head index 
+    dec bx
+    shl bx, 1    
+    
+    mov ah, direction
+    cmp last_direction, ah
+    je no_new_segment
+    
+    ; Create new segment 
+    inc segment_count
+    add bx, 2
+    mov ax, snake_x[bx-2] 
+    mov cx, snake_y[bx-2] 
+    
+    mov snake_x[bx], ax 
+    mov snake_y[bx], cx    
+    
+    no_new_segment:
+        
+    
     cmp direction, 2
     jbe vertical    
     
@@ -74,15 +91,15 @@ game_loop:
     
     store_x_position:
         mov snake_x[bx], ax  
-        jmp drawing
+        jmp move_tail
 
     store_y_position:
         mov snake_y[bx], ax 
         
      
         
-    ; Move tail   
-    mov cx,  used_length
+    move_tail:   
+    mov cx, used_length
     cmp cx, snake_length
     jl not_move_end
     
@@ -98,35 +115,62 @@ game_loop:
     call point
     
     sub sp, 6  
-    ; Move towards other cell
+    ; Move towards other cell   
     mov dx, 1 ; go positive
       
     mov cx, snake_x[0]
     cmp cx, snake_x[2]    
-    je move_y
+    je move_tail_y
       
-    move_x:
+    move_tail_x:
         cmp cx, snake_x[2]  
-        jg set_positive_y       
-        mov dx, -1
-          
-        set_positive_y:
-        
-               
-        sub snake_x[0], dx
-        jmp drawing
-           
-    move_y: 
-        mov cx, snake_y[0] 
-        cmp cx, snake_y[2]  
         jg set_positive_x       
         mov dx, -1
           
         set_positive_x:
         
+               
+        sub snake_x[0], dx
+        jmp segment_tail_status
+           
+    move_tail_y: 
+        mov cx, snake_y[0] 
+        cmp cx, snake_y[2]  
+        jg set_positive_y       
+        mov dx, -1
+          
+        set_positive_y:
+        
         sub snake_y[0], dx
-        jmp drawing
+        jmp segment_tail_status
     
+    segment_tail_status:
+    
+    ; Check if the tail reached the segement, if it did remove the segment and collapse the rest 
+     
+    mov cx, snake_x[0]
+    cmp cx, snake_x[2]
+    jne drawing 
+      
+    mov cx, snake_y[0]
+    cmp cx, snake_y[2]
+    jne drawing
+     
+     
+    mov di, 2
+    dec segment_count  
+    sub bx, 2
+    move_segments:
+        cmp di, bx
+        jg drawing 
+        
+        mov ax, snake_x[di+2]
+        mov cx, snake_y[di+2]
+        mov snake_x[di], ax
+        mov snake_y[di], cx   
+        
+        add di, 2
+        jmp move_segments
     
     not_move_end:
     inc used_length
@@ -146,7 +190,10 @@ game_loop:
     sub sp, 6              
     
     input_handeling:
-
+     
+    mov al, direction    
+    mov last_direction, al
+     
     mov ah, 0x01 
     int 16h               
     jz no_key_pressed          
@@ -154,7 +201,7 @@ game_loop:
     mov ah, 0x00
     int 16h
     mov [key_input], al  
-
+         
     jmp game_loop
 
 set_up:
