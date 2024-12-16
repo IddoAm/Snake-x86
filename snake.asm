@@ -7,9 +7,12 @@ org 100h
 ; Screen mode  
 mov ax, 0x0013
 int 10h
-  
       
-jmp game_loop
+jmp start
+
+SNAKE_COLOR equ 4  
+APPLE_COLOR equ 2
+SPEED equ 5
 
 key_input db 0  
 
@@ -21,13 +24,17 @@ last_direction db 1
 snake_x dw 160, 160, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 snake_y dw 100, 100, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 
+apple_x dw 160
+apple_y dw 80
+
 segment_count dw 2 
 
-snake_length dw 30 
+snake_length dw 20 
 used_length dw 1
 
-color dw 4
-  
+start:
+    ; Draw apple  
+
 game_loop:       
     mov al, key_input
         
@@ -79,11 +86,11 @@ game_loop:
         jne positive
         
     negetive:
-        dec ax
+        sub ax, 1
         jmp store_variable
         
     positive: 
-        inc ax
+        add ax, 1
       
     store_variable:     
         cmp direction, 2
@@ -150,11 +157,11 @@ game_loop:
      
     mov cx, snake_x[0]
     cmp cx, snake_x[2]
-    jne drawing 
+    jne check_collision 
       
     mov cx, snake_y[0]
     cmp cx, snake_y[2]
-    jne drawing
+    jne check_collision
      
      
     mov di, 2
@@ -162,7 +169,7 @@ game_loop:
     sub bx, 2
     move_segments:
         cmp di, bx
-        jg drawing 
+        jg check_collision 
         
         mov ax, snake_x[di+2]
         mov cx, snake_y[di+2]
@@ -174,12 +181,36 @@ game_loop:
     
     not_move_end:
     inc used_length
+            
+    check_collision:
     
+    mov ah,0Dh
+    mov cx,snake_x[bx] 
+    mov dx,snake_y[bx]
+    int 10h
+    cmp al, SNAKE_COLOR 
+    jne check_apple
+    
+    mov ah, 4Ch
+    int 21h 
+    
+    check_apple:
+    
+    mov ax, apple_x
+    cmp ax, snake_x[bx] 
+    jne drawing  
+    
+    mov ax, apple_y
+    cmp ax, snake_y[bx] 
+    jne drawing  
+    
+    add snake_length, 4
+    call generate_apple_position      
         
     drawing:  
     mov ax, snake_x[bx]
     mov bx, snake_y[bx]
-    mov cx, color
+    mov cx, SNAKE_COLOR
       
     push cx
     push bx
@@ -192,13 +223,14 @@ game_loop:
     input_handeling:
      
     mov al, direction    
-    mov last_direction, al
+    mov last_direction, al  
+    mov al, 0
      
     mov ah, 0x01 
     int 16h               
     jz no_key_pressed          
              
-    mov ah, 0x00
+    mov ax, 0x00
     int 16h
     mov [key_input], al  
          
@@ -240,7 +272,90 @@ PROC point ; Draw pixel (dw x, dw y, db colorIndex)
     mov sp, bp            
     pop bp  
     ret 
-ENDP point
+ENDP point  
+
+PROC rand ; Move random number to AX (dw seed, dw min, dw max)
+   push bp              
+   mov bp, sp 
+    
+   push bx
+   push cx
+   push dx
+    
+   mov ah, 00h  ; interrupts to get system time        
+   int 1Ah  ; CX:DX now hold number of clock ticks since midnight
+   
+   mov ax, cx 
+   add ax, [bp+4]
+   mul dx  
+    
+   mov bx, [bp+6] ; min
+   mov cx, [bp+8] ; max   
+   
+   
+    
+   sub cx, bx
+   mov dx, 0
+    
+   div cx
+   mov ax, dx
+   add ax, bx 
+    
+   pop dx
+   pop cx
+   pop bx
+    
+   mov sp, bp            
+   pop bp
+   ret
+ENDP rand
+
+PROC generate_apple_position 
+    ; X
+    mov ax, 200d         
+    push ax
+    mov ax, 120d 
+    push ax 
+    mov ax, apple_x 
+    push ax
+         
+    call rand  
+
+    sub sp, 6
+    
+    mov apple_x, ax 
+    
+    ; Y
+    mov ax, 150d         
+    push ax
+    mov ax, 50d 
+    push ax 
+    mov ax, apple_y 
+    push ax
+         
+    call rand  
+
+    sub sp, 6 
+    
+    mov apple_y, ax
+    
+    ; Draw
+    mov ax, apple_x
+    mov bx, apple_y
+    mov cx, APPLE_COLOR
+      
+    push cx
+    push bx
+    push ax
+    
+    call point
+    
+    sub sp, 6  
+    
+    ret
+    
+    
+        
 
 ret
 
